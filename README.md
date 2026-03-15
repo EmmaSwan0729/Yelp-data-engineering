@@ -9,18 +9,18 @@ End-to-end Lakehouse data pipeline built on Microsoft Fabric, transforming raw Y
 
 ```mermaid
 flowchart LR
-  A[Bronze\nRaw Ingest] --> B[Silver\nClean & Conform]
-  B --> C[DQ Checks\n(dq_rule_result)]
-  C --> D[Gate\nPASS / DEGRADED / BLOCKED]
-  D -->|PASS or DEGRADED| E[Gold\nBusiness Metrics]
+  A[Bronze<br/>Raw Ingest] --> B[Silver<br/>Clean & Conform]
+  B --> C[DQ Checks<br/>(dq_rule_result)]
+  C --> D[Gate<br/>PASS / DEGRADED / BLOCKED]
+  D -->|PASS or DEGRADED| E[Gold<br/>Business Metrics]
   D -->|BLOCKED| F[SKIPPED Gold Run]
 
   B --> G[pipeline_run_log]
   C --> G
   E --> G
 
-  G --> H[Monitoring Views\n7d windows]
-  H --> I[Dashboard / Reporting\n(Power BI)]
+  G --> H[Monitoring Views<br/>7d windows]
+  H --> I[Dashboard / Reporting<br/>(Power BI)]
 ```
 
 - **Bronze**: raw ingestion with metadata (`_ingest_ts`, `_source_file`, `_batch_id`)
