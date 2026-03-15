@@ -75,6 +75,69 @@ erDiagram
 
 ---
 
+## Project Highlights
+
+### Medallion architecture with incremental processing
+- Full Bronze → Silver → Gold pipeline with metadata columns (`_ingest_ts`, `_source_file`, `_batch_id`)
+- Supports late-arriving data with lookback window reprocessing
+
+### Custom data quality framework
+- Rule-based checks with severity levels (CRITICAL / MAJOR)
+- Structured results written to `dq_rule_result` and `dq_table_gate`
+- Gate decision (PASS / DEGRADED / BLOCKED) controls whether Gold runs
+
+### Star schema dimensional model
+- `fact_review` at the center, joined to `dim_business`, `dim_user`, `dim_date`
+- `fact_review` is partitioned by `date_id` for efficient date-range query performance
+
+### Pipeline observability via `pipeline_run_log`
+- Every run logs pipeline name, run ID, timestamps, input/output row counts, and DQ status
+- Status categories: SUCCESS / DEGRADED / BLOCKED / SKIPPED / FAILED
+
+### Gate & control flow (production-style)
+- CRITICAL DQ failure → BLOCKED, downstream Gold write is prevented
+- Intentional non-execution tracked as SKIPPED, not FAILED, to avoid false alerts
+
+### Monitoring framework (7-day rolling window)
+- Runtime intelligence: P50 / P95 / drift detection
+- SLA monitoring with config-driven thresholds (`pipeline_sla_config`)
+- Composite health score (0–100) with HEALTHY / WARNING / CRITICAL classification
+
+---
+
+## Project Highlights
+
+### Medallion architecture with incremental processing
+- Full Bronze → Silver → Gold pipeline on Delta Lake
+- Supports late-arriving data with lookback window reprocessing
+- Preserves historical correctness while recomputing only impacted keys
+
+### Custom data quality framework
+- Rule-based checks with configurable severity levels (CRITICAL / MAJOR)
+- Structured output to `dq_rule_result` and `dq_table_gate`
+- Enables auditability, trend monitoring, and downstream gate control
+
+### Severity-based gate control
+- CRITICAL DQ failure → BLOCKED, Gold write is skipped
+- MAJOR DQ failure → DEGRADED, Gold write proceeds with warning
+- PASS → full execution
+- Explicit SKIPPED state to avoid false failure alerts
+
+### Pipeline observability via `pipeline_run_log`
+- Every run records pipeline name, run ID, timestamps, input/output row counts, and DQ status
+- Provides a queryable audit trail across all pipeline executions
+
+### Partitioned fact table for query performance
+- `fact_review` is partitioned by `date_id`
+- Enables efficient date-range filtering without full table scans
+- Reduces query cost for time-based analytics in the Gold layer
+
+### Star schema dimensional model
+- `fact_review` joined to `dim_business`, `dim_user`, and `dim_date`
+- Clean separation of facts and dimensions for BI and analytics
+
+---
+
 ## Tech Stack
 
 | Category | Tools |
@@ -119,6 +182,9 @@ Yelp-data-engineering/
 │   ├── 04_5_gold_business_metrics.ipynb
 │   ├── 04_6_gold_city_metrics.ipynb
 │   └── 04_7_run_gold_pipeline.ipynb
+├── 05_monitoring/
+│   ├── 05_0_monitoring_init.ipynb
+│   └── 05_1_monitoring_views.ipynb
 ├── docs/
 │   ├── schema.md
 │   └── monitoring.md
@@ -136,6 +202,8 @@ Yelp-data-engineering/
    - BLOCKED / SKIPPED → pipeline stops, logs written
    - PASS / DEGRADED → proceed to Gold
 5. **Gold**: run `04_7_run_gold_pipeline`
+6. **Monitoring** (first time only): run `05_0_monitoring_init`
+7. **Monitoring Views**: run `05_1_monitoring_views`
 
 See [`environment.md`](./environment.md) for platform and runtime requirements.
 See [`docs/schema.md`](./docs/schema.md) for table contracts.
