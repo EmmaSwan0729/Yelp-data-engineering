@@ -245,7 +245,9 @@ Individual stages can be triggered via their dedicated notebooks:
 
 This project is designed to run in Microsoft Fabric Lakehouse. Ensure that all Bronze raw data files are available in the configured storage location.
 
-See `environment.md` for platform and runtime requirements.
+See [`docs/environment.md`](./docs/environment.md) for platform and runtime requirements.
+See [`docs/lineage.md`](./docs/lineage.md) for full data lineage.
+See [`docs/monitoring.md`](./docs/monitoring.md) for observability framework details.
 
 ---
 
