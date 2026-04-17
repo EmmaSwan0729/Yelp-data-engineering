@@ -110,6 +110,10 @@ Each pipeline stage is designed to be safely re-runnable:
 - 15 unit tests covering SCD2 logic, Silver dedup/filter rules, and DQ rule engine
 - GitHub Actions CI runs tests automatically on every push to `main`
 
+### Delta Lake maintenance
+- `OPTIMIZE` compacts small files after each Gold run to improve query performance
+- `VACUUM` removes files older than 7 days (168 hours) to control storage costs
+- Z-Order applied on most common query dimensions (e.g. `business_id`, `date_id` on `fact_review`) to enable data skipping and reduce scan cost for time-based and entity-based analytics
 ---
 
 ## Repository Structure
