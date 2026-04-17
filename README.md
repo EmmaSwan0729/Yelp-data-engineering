@@ -113,7 +113,15 @@ Each pipeline stage is designed to be safely re-runnable:
 ### Delta Lake maintenance
 - `OPTIMIZE` compacts small files after each Gold run to improve query performance
 - `VACUUM` removes files older than 7 days (168 hours) to control storage costs
-- Z-Order applied on most common query dimensions (e.g. `business_id`, `date_id` on `fact_review`) to enable data skipping and reduce scan cost for time-based and entity-based analytics
+- Z-Order applied on most common query dimensions; partition columns are excluded
+  (e.g. `fact_review` is partitioned by `date_id`, so Z-Order is applied on `business_id` only)
+
+### Schema evolution strategy
+- Bronze layer enables `mergeSchema = true` to accommodate upstream schema changes without breaking ingestion
+- Silver layer enforces a fixed schema via explicit column selection; unexpected fields are dropped, not propagated
+- Any schema change in Silver requires a deliberate code update, ensuring downstream Gold tables are never silently affected
+- DQ framework validates column presence and type consistency, surfacing schema drift as a CRITICAL rule failure
+
 ---
 
 ## Repository Structure
