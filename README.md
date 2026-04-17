@@ -1,223 +1,448 @@
-# Yelp Lakehouse Data Engineering Pipeline
-#### (Bronze → Silver → DQ → Gold → Monitoring)
+#!/usr/bin/env python
+# coding: utf-8
 
-A production-style Lakehouse data pipeline built with Spark and Delta Lake on Microsoft Fabric, implementing Medallion architecture (Bronze → Silver → Gold), a custom data quality framework with severity-based gating, and pipeline observability through structured run logging.
+# ## README
+# 
+# null
 
----
+# # Yelp Lakehouse Data Engineering Pipeline 
+# #### (Bronze → Silver → DQ → Gold → Monitoring)
 
-## Architecture
+# This project builds an end-to-end Lakehouse data pipeline using the Yelp public dataset,
+# designed to transform raw, evolving business and review data into reliable analytical
+# tables.
+# 
+# The pipeline emphasizes incremental processing, data quality validation, and operational
+# observability to reflect real-world data engineering challenges, such as late-arriving data,
+# schema consistency, and explainable pipeline behavior.
 
-```mermaid
-flowchart TD
-  A[Bronze] --> B[Silver]
-  B --> C[DQ Checks]
-  C --> D{Gate}
-  D -->|PASS or DEGRADED| E[Gold]
-  D -->|BLOCKED| F[SKIPPED]
-  B --> G[pipeline_run_log]
-  C --> G
-  E --> G
-  G --> H[Monitoring Views]
-  H --> I[Dashboard / Power BI]
-```
+# ---
 
-- **Bronze**: raw ingestion with metadata (`_ingest_ts`, `_source_file`, `_batch_id`)
-- **Silver**: cleaned schema, type casting, deduplication, quality filters
-- **DQ**: rule-based checks with severity gating → `dq_rule_result`, `dq_table_gate`
-- **Gold**: curated aggregates for analytics and BI
-- **Monitoring**: run log + 7-day rolling views for reliability, SLA, and health scoring
+# ## Architecture
 
-### Star Schema (Gold layer)
+# ### High-level flow
 
-The Gold layer is modelled as a star schema. `fact_review` sits at the center, joined to three dimension tables on `business_id`, `user_id`, and `date_id`.
+# ```mermaid
+# flowchart LR
+#   A[Bronze\nRaw Ingest] --> B[Silver\nClean & Conform]
+#   B --> C[DQ Checks\n(dq_rule_result)]
+#   C --> D[Gate\nPASS / DEGRADED / BLOCKED]
+#   D -->|PASS or DEGRADED| E[Gold\nBusiness Metrics]
+#   D -->|BLOCKED| F[SKIPPED Gold Run]
+# 
+#   B --> G[pipeline_run_log\n(run status, duration, timestamps)]
+#   C --> G
+#   E --> G
+# 
+#   G --> H[Monitoring Views\n7d windows]
+#   H --> I[Dashboard / Reporting\n(Power BI)]
+# 
+# ```
 
-```mermaid
-erDiagram
-  fact_review }o--|| dim_business : "business_id"
-  fact_review }o--|| dim_user : "user_id"
-  fact_review }o--|| dim_date : "date_id"
-  fact_review {
-    string review_id PK
-    string business_id FK
-    string user_id FK
-    int date_id FK
-    double stars
-    int useful
-    int funny
-    int cool
-  }
-  dim_business {
-    string business_id PK
-    string name
-    string city
-    string state
-    double stars
-    int review_count
-    string categories
-  }
-  dim_user {
-    string user_id PK
-    string name
-    int review_count
-    double average_stars
-    int fans
-  }
-  dim_date {
-    int date_id PK
-    string date
-    int year
-    int quarter
-    int month
-    int day
-    string day_name
-  }
-```
+# ### Components
+# - **Bronze**: raw ingestion with metadata (e.g., source file, ingest timestamp)
+# - **Silver**: cleaned schema, type casting, derived columns, incremental scope
+# - **DQ**: rule-based checks producing a standardized report table `gold_dq_report`
+# - **Gold**: curated aggregates for analytics / BI
+# - **Monitoring**: run log + views to track status, duration, DQ outcomes, and skip reasons
 
----
+# ---
 
-## Project Highlights
+# ## Tech Stack 
 
-### Medallion architecture with incremental processing
-- Full Bronze → Silver → Gold pipeline with metadata columns (`_ingest_ts`, `_source_file`, `_batch_id`)
-- Supports late-arriving data with lookback window reprocessing
+# ### Data Processing
+# - **Apache Spark (PySpark)** – distributed data processing and transformation
+# - **Spark SQL** – aggregation, joins, and analytical queries
+# 
+# ### Lakehouse & Storage
+# - **Delta Lake** – ACID-compliant tables for Bronze / Silver / Gold layers
+# - **Lakehouse Architecture** – layered design for raw, cleaned, and curated data
+# 
+# ### Data Quality & Observability
+# - **Custom Data Quality Framework** – rule-based checks with severity levels
+# - **Pipeline Run Logging** – run-level observability including status, duration, and metrics
+# - **Gate-controlled Execution** – SKIP and BLOCK logic to protect downstream Gold tables
+# 
+# ### Languages & Tooling
+# - **Python** – pipeline logic, DQ rules, and utilities
+# - **SQL** – data validation, monitoring views, and analysis
+# - **Databricks / Microsoft Fabric Notebooks** – development and execution environment
+# 
 
-### Custom data quality framework
-- Rule-based checks with severity levels (CRITICAL / MAJOR)
-- Structured results written to `dq_rule_result` and `dq_table_gate`
-- Gate decision (PASS / DEGRADED / BLOCKED) controls whether Gold runs
+# ---
 
-### Star schema dimensional model
-- `fact_review` at the center, joined to `dim_business`, `dim_user`, `dim_date`
-- `fact_review` is partitioned by `date_id` for efficient date-range query performance
+# ## Project Highlights
 
-### Pipeline observability via `pipeline_run_log`
-- Every run logs pipeline name, run ID, timestamps, input/output row counts, and DQ status
-- Status categories: SUCCESS / DEGRADED / BLOCKED / SKIPPED / FAILED
+# ### Incremental processing with lookback window
+# - Supports late-arriving data
+# - Recomputes impacted business keys only, while preserving historical correctness
 
-### Gate & control flow (production-style)
-- CRITICAL DQ failure → BLOCKED, downstream Gold write is prevented
-- Intentional non-execution tracked as SKIPPED, not FAILED, to avoid false alerts
+# ### Data Quality framework → standardized DQ report table
+# - DQ rules produce structured metrics (row count, null ratio, value range, etc.)
+# - Outputs as `gold_dq_report`, enabling auditability and trend monitoring
 
-### Monitoring framework (7-day rolling window)
-- Runtime intelligence: P50 / P95 / drift detection
-- SLA monitoring with config-driven thresholds (`pipeline_sla_config`)
-- Composite health score (0–100) with HEALTHY / WARNING / CRITICAL classification
+# ### Run observability via `pipeline_run_log`
+# - Every run writes a log record including:
+#   - pipeline name, run_id, timestamps, duration
+#   - status (SUCCESS / FAILED / SKIPPED)
+#   - counts and key metrics
+#   - error context and skip reason
 
----
+# ### Gate & Control Flow (production-style)
+# - If upstream data not found → **SKIP**
+# - If DQ severity is high → **BLOCK** downstream Gold write
+# - Clear, explainable control flow for reliable operations
 
-## Project Highlights
+# ### SCD Type 2 dimensional model
+# - `dim_business` and `dim_user` implement SCD Type 2 using Delta Lake MERGE
+# - Three tracking columns added: `is_current`, `effective_from`, `effective_to`
+# - When tracked attributes change, the old record is expired (`is_current = false`, `effective_to` set) and a new current record is inserted
+# - Tracked attributes: name, city, state, stars, review_count, categories (business); name, review_count, average_stars, fans (user)
+# - `fact_review` joins to dimensions on `is_current = true` to always reflect the latest version
 
-### Medallion architecture with incremental processing
-- Full Bronze → Silver → Gold pipeline on Delta Lake
-- Supports late-arriving data with lookback window reprocessing
-- Preserves historical correctness while recomputing only impacted keys
+# ---
 
-### Custom data quality framework
-- Rule-based checks with configurable severity levels (CRITICAL / MAJOR)
-- Structured output to `dq_rule_result` and `dq_table_gate`
-- Enables auditability, trend monitoring, and downstream gate control
+# ## Repository Structure
 
-### Severity-based gate control
-- CRITICAL DQ failure → BLOCKED, Gold write is skipped
-- MAJOR DQ failure → DEGRADED, Gold write proceeds with warning
-- PASS → full execution
-- Explicit SKIPPED state to avoid false failure alerts
+# ```
+# flowchart LR
+# 
+#   %% Execution Layer
+#   A[Bronze\nRaw Ingest] --> B[Silver\nClean & Conform]
+#   B --> C[DQ Checks\n(dq_rule_result)]
+#   C --> D[Gate\nPASS / DEGRADED / BLOCKED]
+#   D -->|PASS or DEGRADED| E[Gold\nBusiness Metrics]
+#   D -->|BLOCKED| F[SKIPPED Gold Run]
+# 
+#   %% Logging Layer
+#   B --> G[pipeline_run_log]
+#   C --> G
+#   E --> G
+# 
+#   %% Monitoring Layer
+#   G --> H[Monitoring Views\n(7d rolling)]
+#   H --> H1[Runtime Intelligence\n(P50 / P95 / Drift)]
+#   H --> H2[SLA Monitoring\n(Config-driven)]
+# 
+#   %% Governance Layer
+#   H2 --> J[SLA Summary]
+#   H --> K[Composite Health Score]
+# 
+#   %% Config Table
+#   S[pipeline_sla_config] --> H2
+# 
+#   %% Dashboard
+#   J --> I[Dashboard / Reporting]
+#   K --> I
+#   H1 --> I
+# 
+# ```
+# 
 
-### Pipeline observability via `pipeline_run_log`
-- Every run records pipeline name, run ID, timestamps, input/output row counts, and DQ status
-- Provides a queryable audit trail across all pipeline executions
+# ---
 
-### Partitioned fact table for query performance
-- `fact_review` is partitioned by `date_id`
-- Enables efficient date-range filtering without full table scans
-- Reduces query cost for time-based analytics in the Gold layer
+# ## Tables & Contracts
 
-### Star schema dimensional model
-- `fact_review` joined to `dim_business`, `dim_user`, and `dim_date`
-- Clean separation of facts and dimensions for BI and analytics
+# #### `gold_dq_report`
+# 
+# Stores DQ check outcomes in a queryable format.
+# 
+# **Typical columns**
+# - run_id: string (nullable = true)
+# - layer: string (nullable = true)
+# - dataset: string (nullable = true)
+# - rule_name: string (nullable = true)
+# - rule_type: string (nullable = true)
+# - column_name: string (nullable = true)
+# - metric_value: double (nullable = true)
+# - threshold: double (nullable = true)
+# - status: string (nullable = true)
+# - checked_at: timestamp (nullable = true)
+# - details: string (nullable = true)
 
----
+# #### `pipeline_run_log`
+# 
+# Tracks pipeline run lifecycle for observability.
+# 
+# **Typical columns**
+# - pipeline_run_id: string (nullable = true)
+# - pipeline_name: string (nullable = true)
+# - layer: string (nullable = true)
+# - target_table: string (nullable = true)
+# - status: string (nullable = true)
+# - start_ts: timestamp (nullable = true)
+# - end_ts: timestamp (nullable = true)
+# - duration_sec: double (nullable = true)
+# - dq_run_id: string (nullable = true)
+# - dq_status: string (nullable = true)
+# - dq_checked_table: string (nullable = true)
+# - input_rows: long (nullable = true)
+# - output_rows: long (nullable = true)
+# - error_message: string (nullable = true)
+# - created_at: timestamp (nullable = true)
+# 
 
-## Tech Stack
+# ### Gold Analytical Tables
+# 
+# Other Gold tables are business-oriented aggregates derived from Silver data.
+# 
+# Their schemas may evolve based on analytical requirements and are therefore not treated as stable data contracts in this project.
+# 
+# This separation ensures that monitoring and governance layers rely only on explicitly defined contract tables.
 
-| Category | Tools |
-|----------|-------|
-| Data Processing | Apache Spark (PySpark), Spark SQL |
-| Storage | Delta Lake, Microsoft Fabric Lakehouse |
-| Data Quality | Custom rule engine with severity-based gating |
-| Observability | Pipeline run logging, monitoring views |
-| Language | Python, SQL |
-| Platform | Microsoft Fabric (Synapse PySpark) |
+# ---
 
----
+# ## Monitoring & Observability
+# 
+# 
 
-## Repository Structure
+# ### Monitoring Framework Overview
+# 
+# The monitoring layer provides a production-style observability framework on top of all pipeline executions.
+# 
+# All pipeline runs are recorded in pipeline_run_log, and data quality results are persisted in:
+# 
+# - `dq_rule_result`
+# 
+# - `gold_dq_report`
+# 
+# Monitoring views aggregate these logs using a 7-day rolling window to provide structured operational visibility.
+# 
+# ---
 
-```
-Yelp-data-engineering/
-├── 01_bronze_ingest/
-│   ├── 01_0_bronze_run_all.ipynb
-│   ├── 01_1_bronze_business.ipynb
-│   ├── 01_2_bronze_review.ipynb
-│   ├── 01_3_bronze_checkin.ipynb
-│   ├── 01_4_bronze_user.ipynb
-│   └── 01_5_bronze_tip.ipynb
-├── 02_silver_conform/
-│   ├── 02_0_silver_run_all.ipynb
-│   ├── 02_1_silver_business.ipynb
-│   ├── 02_2_silver_review.ipynb
-│   ├── 02_3_silver_checkin.ipynb
-│   ├── 02_4_silver_user.ipynb
-│   └── 02_5_silver_tip.ipynb
-├── 03_dq_framework/
-│   ├── 03_0_dq_init_tables.ipynb
-│   ├── 03_1_dq_rule_engine.ipynb
-│   ├── 03_1_1_dq_rule_config.ipynb
-│   └── 03_2_dq_silver_run_all.ipynb
-├── 04_gold_marts/
-│   ├── 04_1_gold_fact_review.ipynb
-│   ├── 04_2_gold_dim_business.ipynb
-│   ├── 04_3_gold_dim_user.ipynb
-│   ├── 04_4_gold_dim_date.ipynb
-│   ├── 04_5_gold_business_metrics.ipynb
-│   ├── 04_6_gold_city_metrics.ipynb
-│   └── 04_7_run_gold_pipeline.ipynb
-├── 05_monitoring/
-│   ├── 05_0_monitoring_init.ipynb
-│   └── 05_1_monitoring_views.ipynb
-├── docs/
-│   ├── schema.md
-│   └── monitoring.md
-└── environment.md
-```
+# ### Observability Architecture
+# 
+# The monitoring layer is built on top of execution logs and DQ evidence tables.
+# 
+# It enables visibility into:
+# 
+# - Execution reliability
+# 
+# - Data quality stability
+# 
+# - Runtime behavior
+# 
+# - Skip / block patterns
+# 
+# - SLA compliance
+# 
+# The system separates:
+# 
+# - Raw execution logs (audit layer)
+# 
+# - Monitoring views (operational layer)
+# 
+# - Aggregated summaries (management layer)
+# 
+# - Composite health metrics (KPI layer)
+# 
+# This layered design ensures both traceability and operational clarity.
+# 
+# ---
 
----
+# ### Execution Semantics
+# 
+# Pipeline execution outcomes are explicitly categorized:
+# 
+# - SUCCESS – Pipeline executed successfully
+# 
+# - DEGRADED – Pipeline executed with acceptable DQ risk
+# 
+# - BLOCKED – Execution prevented due to upstream conditions or CRITICAL DQ failure
+# 
+# - SKIPPED – Pipeline intentionally not executed (e.g., upstream Gate BLOCKED)
+# 
+# - FAILED – Pipeline terminated due to runtime or system errors
+# 
+# SKIPPED is treated as a first-class state to avoid false failure alerts and preserve semantic clarity.
+# 
+# ---
 
-## How to Run
+# ### Success Rate Semantics
+# 
+# Two success rate metrics are provided.
+# 
+# **1) Success Rate (Excluding SKIPPED)**  
+# SKIPPED runs are excluded from the denominator because they represent intentional non-execution rather than failure.
+# 
+# Success Rate = SUCCESS / NULLIF((TOTAL - SKIPPED), 2)
+# 
+# If all runs are SKIPPED, the metric returns NULL to avoid misleading 0% values.
+# 
+# This metric reflects true execution reliability.
+# 
+# **2) Success Rate (Including SKIPPED)**  
+# Success Rate = SUCCESS / TOTAL
+# 
+# This metric reflects overall pipeline experience, including intentional skips.
+# 
+# This design ensures that intentional non-execution (SKIPPED) does not artificially degrade reliability metrics.
+# 
+# ---
 
-1. **Bronze**: run `01_0_bronze_run_all`
-2. **Silver**: run `02_0_silver_run_all`
-3. **DQ**: run `03_2_dq_silver_run_all`
-4. **Gate decision**:
-   - BLOCKED / SKIPPED → pipeline stops, logs written
-   - PASS / DEGRADED → proceed to Gold
-5. **Gold**: run `04_7_run_gold_pipeline`
-6. **Monitoring** (first time only): run `05_0_monitoring_init`
-7. **Monitoring Views**: run `05_1_monitoring_views`
+# ### Runtime Intelligence
+# 
+# Beyond binary success/failure monitoring, the system tracks runtime behavior.
+# 
+# Monitoring views provide:
+# 
+# - P50 runtime percentile (median execution time)
+# 
+# - P95 runtime percentile (tail latency indicator)
+# 
+# - Average duration
+# 
+# - Runtime drift detection (3-day vs 7-day comparison)
+# 
+# This enables detection of gradual performance degradation even when pipelines are still succeeding.
+# 
+# ---
 
-See [`environment.md`](./environment.md) for platform and runtime requirements.
-See [`docs/schema.md`](./docs/schema.md) for table contracts.
-See [`docs/monitoring.md`](./docs/monitoring.md) for observability framework details.
+# ### SLA Monitoring (Config-Driven)
+# 
+# SLA thresholds are externalized into a configuration table (pipeline_sla_config) rather than hardcoded.
+# 
+# This enables:
+# 
+# - Dynamic SLA updates without modifying monitoring logic
+# 
+# - Different thresholds per pipeline
+# 
+# - Future support for environment-specific configurations
+# 
+# SLA compliance is evaluated via:
+# 
+# - `v_monitor_sla_7d`
+# 
+# - `v_monitor_sla_summary_7d`
+# 
+# Breach counts and breach rates are aggregated over a 7-day rolling window.
+# 
+# ---
 
----
+# ### Composite Run Health Score
+# 
+# A composite operational health score integrates multiple monitoring signals:
+# 
+# - Execution reliability (success rate)  (40%)
+# 
+# - SLA compliance  (30%)
+# 
+# - Blocked frequency  (20%)
+# 
+# - Critical DQ failures  (10%)
+# 
+# Weighting ensures that execution reliability and SLA compliance have greater impact on overall health than isolated DQ incidents.
+# 
+# 
+# Each pipeline receives:
+# 
+# - A weighted health score (0–100)
+# 
+# A health classification:
+# 
+# - HEALTHY
+# 
+# - WARNING
+# 
+# - CRITICAL
+# 
+# This abstraction provides a management-level KPI for pipeline stability.
+# 
+# ---
 
-## Acknowledgements
+# ### Operational Actionability
+# 
+# Monitoring outputs are designed to be actionable:
+# 
+# - FAILED runs surface error context
+# 
+# - SKIPPED runs include explicit skip reasons
+# 
+# - BLOCKED runs indicate upstream DQ issues
+# 
+# - SLA breaches highlight performance risks
+# 
+# - Critical DQ failures are prioritized for remediation
+# 
+# The monitoring layer is modular and extensible, allowing additional metrics to be added without altering pipeline execution logic.
 
-- **Yelp Dataset**: This project uses the [Yelp Open Dataset](https://www.yelp.com/dataset), kindly made available by Yelp Inc. for academic and personal learning purposes.
-- **Microsoft Fabric**: Pipeline development and execution were carried out using [Microsoft Fabric](https://www.microsoft.com/en-us/microsoft-fabric), including its Lakehouse, Spark runtime, and notebook environments.
+# Together, these layers form a modular observability framework that separates execution logging, operational monitoring, governance control, and management-level KPIs.
+# 
 
----
+# ---
 
-## Disclaimer
+# ## How to Run
+# 
+# ### Production
+# Trigger `PL_Master` in Microsoft Fabric. The pipeline orchestrates the full 
+# Bronze → Silver → DQ → Gold → Monitoring flow automatically, including 
+# DQ gate control and failure handling.
+# 
+# ### Manual / Debug
+# Individual stages can be triggered via their dedicated notebooks:
+# - `01_0_bronze_run_all` — Bronze ingestion
+# - `02_0_silver_run_all` — Silver conformance
+# - `03_2_dq_silver_run_all` — DQ checks
+# - `04_7_run_gold_pipeline` — Gold marts
+# - `05_1_monitoring_views` — Monitoring views
 
-This project is built solely for **personal learning purposes**, with the goal of exploring data engineering concepts and Microsoft Fabric product components. It is not intended for commercial use. All data used in this project is publicly available and used in accordance with the Yelp Dataset Terms of Use.
+# ### Environment
+# 
+# This project is designed to run in:
+# 
+# Microsoft Fabric Lakehouse (recommended)
+# 
+# Databricks with Delta Lake support
+# 
+# Ensure that all Bronze raw data files are available in the configured storage location.
+
+# ### Execution Order
+# 
+# #### 1. Bronze Ingestion
+# 
+# - Ingest raw Yelp data into Bronze tables.
+# 
+# Metadata columns such as _ingest_ts and _source_file are added.
+# 
+# #### 2. Silver Conform (Incremental Processing)
+# 
+# - Clean and standardize schemas.
+# 
+# - Apply incremental lookback window.
+# 
+# - Write conformed Silver tables.
+# 
+# #### 3. Data Quality Checks
+# 
+# - Execute DQ rules on Silver outputs.
+# 
+# - Write results to gold_dq_report and dq_rule_result.
+# 
+# #### 4. Gate Evaluation
+# 
+# - If no incremental data → SKIPPED
+# 
+# - If CRITICAL DQ failure → BLOCKED
+# 
+# - Otherwise → PASS
+# 
+# #### 5. Gold Aggregation
+# 
+# - Execute Gold transformations only when Gate = PASS or DEGRADED.
+# 
+# - Log run results in pipeline_run_log.
+# 
+# #### 6. Monitoring Layer
+# 
+# - Run 04_monitoring_views notebook.
+# 
+# - Refresh monitoring views:
+# 
+#   - Success rate
+# 
+#   - Runtime intelligence
+# 
+#   - SLA compliance
+# 
+#   - Composite health score
