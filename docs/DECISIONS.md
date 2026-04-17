@@ -66,8 +66,11 @@ including the rationale behind each choice.
 - Keeping the full pipeline within Delta Lake maintains a unified technology stack and avoids additional data movement steps
 - Delta Lake MERGE is required for SCD2 on dimension tables, which is not natively supported in Fabric Warehouse
 - The Lakehouse SQL Analytics Endpoint provides sufficient query performance for the current analytical workload
+- If Gold data is consumed by machine learning workloads, Lakehouse is the preferred choice as ML frameworks (PySpark, sklearn) read Delta files directly and benefit from Delta Time Travel for reproducible training datasets
 
 **Trade-off**: BI query performance may be lower than a native Warehouse for high-concurrency workloads; if this becomes a bottleneck, Fabric Shortcuts can expose Gold tables to a Warehouse without duplicating data.
+
+---
 
 ---
 
