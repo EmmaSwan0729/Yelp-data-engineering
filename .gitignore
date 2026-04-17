@@ -5,3 +5,5 @@ __pycache__/
 *.csv
 *.parquet
 *.json
+.venv/
+.pytest_cache/
