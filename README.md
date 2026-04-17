@@ -13,18 +13,18 @@ The pipeline emphasizes incremental processing, data quality validation, and ope
 
 ```mermaid
 flowchart LR
-  A[Bronze\nRaw Ingest] --> B[Silver\nClean & Conform]
-  B --> C[DQ Checks\n(dq_rule_result)]
-  C --> D[Gate\nPASS / DEGRADED / BLOCKED]
-  D -->|PASS or DEGRADED| E[Gold\nBusiness Metrics]
-  D -->|BLOCKED| F[SKIPPED Gold Run]
+  A[Bronze] --> B[Silver]
+  B --> C[DQ Checks]
+  C --> D{Gate}
+  D -->|PASS or DEGRADED| E[Gold]
+  D -->|BLOCKED| F[SKIPPED]
 
-  B --> G[pipeline_run_log\n(run status, duration, timestamps)]
+  B --> G[pipeline_run_log]
   C --> G
   E --> G
 
-  G --> H[Monitoring Views\n7d windows]
-  H --> I[Dashboard / Reporting\n(Power BI)]
+  G --> H[Monitoring Views]
+  H --> I[Dashboard / Power BI]
 ```
 
 ### Components
@@ -245,9 +245,14 @@ Individual stages can be triggered via their dedicated notebooks:
 
 This project is designed to run in Microsoft Fabric Lakehouse. Ensure that all Bronze raw data files are available in the configured storage location.
 
-See [`docs/environment.md`](./docs/environment.md) for platform and runtime requirements.
-See [`docs/lineage.md`](./docs/lineage.md) for full data lineage.
-See [`docs/monitoring.md`](./docs/monitoring.md) for observability framework details.
+---
+
+## Documentation
+
+- [`docs/environment.md`](./docs/environment.md) — platform and runtime requirements
+- [`docs/lineage.md`](./docs/lineage.md) — full data lineage
+- [`docs/monitoring.md`](./docs/monitoring.md) — observability framework details
+- [`docs/DECISIONS.md`](./docs/DECISIONS.md) — architecture decision records
 
 ---
 
