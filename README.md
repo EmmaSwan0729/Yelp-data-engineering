@@ -64,16 +64,15 @@ flowchart LR
 - Full Bronze → Silver → Gold pipeline with metadata columns (`_ingest_ts`, `_source_file`, `_batch_id`)
 - Supports late-arriving data with lookback window reprocessing
 
-### Gold layer business value
-- `fact_review` — enables review-level analysis across businesses, users, and time
-- `dim_business` / `dim_user` / `dim_date` — dimension tables supporting multi-dimensional slicing
-- `business_metrics_gold` — identifies top-performing businesses by rating, review volume, and engagement
-- `city_metrics_gold` — supports market-level performance comparison across states and cities
-
 ### Custom data quality framework
 - Rule-based checks with severity levels (CRITICAL / MAJOR)
 - Structured results written to `dq_rule_result` and `dq_table_gate`
 - Gate decision (PASS / DEGRADED / BLOCKED) controls whether Gold runs
+
+### Gate & control flow (production-style)
+- CRITICAL DQ failure → BLOCKED, downstream Gold write is prevented
+- MAJOR DQ failure → DEGRADED, Gold write proceeds with warning
+- Intentional non-execution tracked as SKIPPED, not FAILED, to avoid false alerts
 
 ### SCD Type 2 dimensional model
 - `dim_business` and `dim_user` implement SCD Type 2 using Delta Lake MERGE
@@ -82,10 +81,11 @@ flowchart LR
 - Tracked attributes: name, city, state, stars, review_count, categories (business); name, review_count, average_stars, fans (user)
 - `fact_review` joins to dimensions on `is_current = true`; point-in-time correctness is not preserved — a known trade-off accepted for this use case
 
-### Gate & control flow (production-style)
-- CRITICAL DQ failure → BLOCKED, downstream Gold write is prevented
-- MAJOR DQ failure → DEGRADED, Gold write proceeds with warning
-- Intentional non-execution tracked as SKIPPED, not FAILED, to avoid false alerts
+### Gold layer business value
+- `fact_review` — enables review-level analysis across businesses, users, and time
+- `dim_business` / `dim_user` / `dim_date` — dimension tables supporting multi-dimensional slicing
+- `business_metrics_gold` — identifies top-performing businesses by rating, review volume, and engagement
+- `city_metrics_gold` — supports market-level performance comparison across states and cities
 
 ### Pipeline observability via `pipeline_run_log`
 - Every run logs pipeline name, run ID, timestamps, input/output row counts, and DQ status
@@ -100,6 +100,7 @@ flowchart LR
 - Runtime intelligence: P50 / P95 / drift detection
 - SLA monitoring with config-driven thresholds (`pipeline_sla_config`)
 - Composite health score (0–100) with HEALTHY / WARNING / CRITICAL classification
+- Monitoring views are designed for alerting and BI consumption, providing actionable signals for pipeline reliability and data quality health
 
 ### Idempotency
 Each pipeline stage is designed to be safely re-runnable, ensuring deterministic output across re-runs:
