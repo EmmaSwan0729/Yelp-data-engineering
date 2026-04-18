@@ -80,9 +80,7 @@ flowchart LR
 - Three tracking columns added: `is_current`, `effective_from`, `effective_to`
 - When tracked attributes change, the old record is expired (`is_current = false`, `effective_to` set) and a new current record is inserted
 - Tracked attributes: name, city, state, stars, review_count, categories (business); name, review_count, average_stars, fans (user)
-- `fact_review` joins to dimensions on `is_current = true` to always reflect the latest version
-- Note: `fact_review` joins to dimensions on `is_current = true` for simplicity; 
-  point-in-time correctness is not preserved — a known trade-off accepted for this use case
+- `fact_review` joins to dimensions on `is_current = true`; point-in-time correctness is not preserved — a known trade-off accepted for this use case
 
 ### Gate & control flow (production-style)
 - CRITICAL DQ failure → BLOCKED, downstream Gold write is prevented
@@ -104,7 +102,7 @@ flowchart LR
 - Composite health score (0–100) with HEALTHY / WARNING / CRITICAL classification
 
 ### Idempotency
-Each pipeline stage is designed to be safely re-runnable:
+Each pipeline stage is designed to be safely re-runnable, ensuring deterministic output across re-runs:
 
 | Layer | Strategy | Detail |
 |-------|----------|--------|
@@ -221,6 +219,7 @@ Yelp-data-engineering/
 └── requirements-dev.txt
 
 ```
+</details>
 
 ---
 
@@ -233,7 +232,7 @@ Pipeline execution outcomes are explicitly categorized:
 - **SUCCESS** – Pipeline executed successfully
 - **DEGRADED** – Pipeline executed with acceptable DQ risk
 - **BLOCKED** – Execution prevented due to CRITICAL DQ failure
-- **SKIPPED** – Pipeline intentionally not executed (e.g., upstream Gate BLOCKED)
+- **SKIPPED** — Pipeline intentionally not executed (e.g., upstream Gate BLOCKED); treated as first-class state to avoid alert fatigue
 - **FAILED** – Pipeline terminated due to runtime or system errors
 
 SKIPPED is treated as a first-class state to avoid false failure alerts.
@@ -309,10 +308,10 @@ This project is designed to run in Microsoft Fabric Lakehouse. Ensure that all B
 ## Limitations & Future Work
 
 - No streaming or real-time ingestion; pipeline is batch-only
-- No CDC (Change Data Capture) ingestion from operational databases
+- No CDC ingestion from operational databases; Bronze uses full load from static files
 - SCD2 joins use current snapshot only; point-in-time historical joins not implemented
-- Scale testing limited to Yelp dataset (~7M reviews); behavior at 10x scale not validated
-- No automated alerting on pipeline failure (monitoring views require manual refresh)
+- Scale testing limited to Yelp dataset (~7M reviews); behavior at larger scale not validated
+- No automated alerting on pipeline failure; monitoring views require manual refresh or scheduled trigger
 
 ---
 
