@@ -282,7 +282,7 @@ Each pipeline receives a weighted health score (0–100) and a classification: *
 ## How to Run
 
 ### Production
-Trigger `PL_Master` in Microsoft Fabric. The pipeline orchestrates the full Bronze → Silver → DQ → Gold → Monitoring flow automatically, including DQ gate control and failure handling.
+Trigger `PL_Master` (the master orchestration pipeline) in Microsoft Fabric. The pipeline orchestrates the full Bronze → Silver → DQ → Gold → Monitoring flow automatically, including DQ gate control and failure handling.
 
 ### Manual / Debug
 Individual stages can be triggered via their dedicated notebooks:
