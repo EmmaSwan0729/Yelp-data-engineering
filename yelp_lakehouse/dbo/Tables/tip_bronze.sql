@@ -5,7 +5,7 @@ CREATE TABLE [dbo].[tip_bronze] (
 	[date] varchar(8000) NULL, 
 	[text] varchar(8000) NULL, 
 	[user_id] varchar(8000) NULL, 
-	[_ingest_ts] date NULL, 
+	[_ingest_ts] datetime2(6) NULL, 
 	[_source_file] varchar(8000) NULL, 
 	[_batch_id] varchar(8000) NULL
 );

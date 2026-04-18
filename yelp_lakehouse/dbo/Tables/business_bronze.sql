@@ -12,7 +12,7 @@ CREATE TABLE [dbo].[business_bronze] (
 	[review_count] bigint NULL, 
 	[stars] float NULL, 
 	[state] varchar(8000) NULL, 
-	[_source_file] varchar(8000) NULL, 
 	[_ingest_ts] datetime2(6) NULL, 
+	[_source_file] varchar(8000) NULL, 
 	[_batch_id] varchar(8000) NULL
 );
