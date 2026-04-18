@@ -132,9 +132,10 @@ Each pipeline stage is designed to be safely re-runnable, ensuring deterministic
 
 ## Repository Structure
 
-```
 <details>
 <summary>Repository Structure</summary>
+
+```
 Yelp-data-engineering/
 ├── 01_bronze_ingest/
 │   ├── 01_0_bronze_run_all.ipynb
