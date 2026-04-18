@@ -5,6 +5,15 @@ This project builds an end-to-end Lakehouse data pipeline using the Yelp public 
 
 The pipeline emphasizes incremental processing, data quality validation, and operational observability to reflect real-world data engineering challenges, such as late-arriving data, schema consistency, and explainable pipeline behavior.
 
+## Key Capabilities
+
+- **Incremental Lakehouse pipeline** with late-arriving data handling via configurable lookback window
+- **Config-driven Data Quality framework** — rules defined in JSON, new checks added without code changes
+- **Gate-controlled execution** — CRITICAL DQ failures block downstream Gold writes automatically
+- **SCD Type 2 dimensional modeling** using Delta Lake MERGE for `dim_business` and `dim_user`
+- **End-to-end pipeline observability** with SLA monitoring, composite health scoring, and run-level logging
+- **End-to-end data lineage** documented, enabling impact analysis and debugging across Bronze → Gold layers
+
 ---
 
 ## Architecture
@@ -62,10 +71,11 @@ flowchart LR
 
 ### Medallion architecture with incremental processing
 - Full Bronze → Silver → Gold pipeline with metadata columns (`_ingest_ts`, `_source_file`, `_batch_id`)
-- Supports late-arriving data with lookback window reprocessing
+- Incremental scope controlled via ingest timestamp + configurable lookback window, with late-arriving data handled through reprocessing
 
 ### Custom data quality framework
 - Rule-based checks with severity levels (CRITICAL / MAJOR)
+- DQ rules are config-driven (`dq_rules.json`), allowing new rules to be added without code changes
 - Structured results written to `dq_rule_result` and `dq_table_gate`
 - Gate decision (PASS / DEGRADED / BLOCKED) controls whether Gold runs
 
@@ -97,13 +107,15 @@ flowchart LR
 - Each stage is independently re-runnable for debugging
 
 ### Monitoring framework (7-day rolling window)
+Enables proactive detection of pipeline degradation and data quality risks before impacting downstream consumers.
+
 - Runtime intelligence: P50 / P95 / drift detection
 - SLA monitoring with config-driven thresholds (`pipeline_sla_config`)
 - Composite health score (0–100) with HEALTHY / WARNING / CRITICAL classification
 - Monitoring views are designed for alerting and BI consumption, providing actionable signals for pipeline reliability and data quality health
 
 ### Idempotency
-Each pipeline stage is designed to be safely re-runnable, ensuring deterministic output across re-runs:
+Each pipeline stage is designed to be safely re-runnable, ensuring deterministic outputs and safe re-runs under failure or partial execution scenarios:
 
 | Layer | Strategy | Detail |
 |-------|----------|--------|
@@ -221,6 +233,7 @@ Yelp-data-engineering/
 └── requirements-dev.txt
 
 ```
+
 </details>
 
 ---
@@ -308,6 +321,8 @@ This project is designed to run in Microsoft Fabric Lakehouse. Ensure that all B
 ---
 
 ## Limitations & Future Work
+
+> Design prioritises reliability and observability over real-time latency — a deliberate trade-off for this batch-oriented use case.
 
 - No streaming or real-time ingestion; pipeline is batch-only
 - No CDC ingestion from operational databases; Bronze uses full load from static files
