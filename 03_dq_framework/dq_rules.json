@@ -1,0 +1,139 @@
+{
+    "business_silver": [
+        {
+            "rule_id": "bus_001",
+            "rule_name": "business_id_not_null",
+            "rule_type": "null_check",
+            "column_name": "business_id",
+            "severity": "CRITICAL",
+            "dimension": "completeness",
+            "threshold_rate": 0.0
+        },
+        {
+            "rule_id": "bus_002",
+            "rule_name": "stars_range_check",
+            "rule_type": "range_check",
+            "column_name": "stars",
+            "severity": "MAJOR",
+            "dimension": "validity",
+            "threshold_rate": 0.01,
+            "min_val": 1,
+            "max_val": 5
+        },
+        {
+            "rule_id": "bus_003",
+            "rule_name": "review_count_non_negative",
+            "rule_type": "range_check",
+            "column_name": "review_count",
+            "severity": "MAJOR",
+            "dimension": "validity",
+            "threshold_rate": 0.0,
+            "min_val": 0,
+            "max_val": 999999999
+        }
+    ],
+    "review_silver": [
+        {
+            "rule_id": "rev_001",
+            "rule_name": "review_id_not_null",
+            "rule_type": "null_check",
+            "column_name": "review_id",
+            "severity": "CRITICAL",
+            "dimension": "completeness",
+            "threshold_rate": 0.0
+        },
+        {
+            "rule_id": "rev_002",
+            "rule_name": "stars_range_check",
+            "rule_type": "range_check",
+            "column_name": "stars",
+            "severity": "MAJOR",
+            "dimension": "validity",
+            "threshold_rate": 0.01,
+            "min_val": 1,
+            "max_val": 5
+        }
+    ],
+    "checkin_silver": [
+        {
+            "rule_id": "chk_001",
+            "rule_name": "business_id_not_null",
+            "rule_type": "null_check",
+            "column_name": "business_id",
+            "severity": "CRITICAL",
+            "dimension": "completeness",
+            "threshold_rate": 0.0
+        },
+        {
+            "rule_id": "chk_002",
+            "rule_name": "date_not_null",
+            "rule_type": "null_check",
+            "column_name": "date",
+            "severity": "MAJOR",
+            "dimension": "completeness",
+            "threshold_rate": 0.0
+        }
+    ],
+    "user_silver": [
+        {
+            "rule_id": "usr_001",
+            "rule_name": "user_id_not_null",
+            "rule_type": "null_check",
+            "column_name": "user_id",
+            "severity": "CRITICAL",
+            "dimension": "completeness",
+            "threshold_rate": 0.0
+        },
+        {
+            "rule_id": "usr_002",
+            "rule_name": "review_count_non_negative",
+            "rule_type": "range_check",
+            "column_name": "review_count",
+            "severity": "MAJOR",
+            "dimension": "validity",
+            "threshold_rate": 0.0,
+            "min_val": 0,
+            "max_val": 999999999
+        },
+        {
+            "rule_id": "usr_003",
+            "rule_name": "average_stars_range",
+            "rule_type": "range_check",
+            "column_name": "average_stars",
+            "severity": "MAJOR",
+            "dimension": "validity",
+            "threshold_rate": 0.01,
+            "min_val": 1,
+            "max_val": 5
+        }
+    ],
+    "tip_silver": [
+        {
+            "rule_id": "tip_001",
+            "rule_name": "user_id_not_null",
+            "rule_type": "null_check",
+            "column_name": "user_id",
+            "severity": "CRITICAL",
+            "dimension": "completeness",
+            "threshold_rate": 0.0
+        },
+        {
+            "rule_id": "tip_002",
+            "rule_name": "business_id_not_null",
+            "rule_type": "null_check",
+            "column_name": "business_id",
+            "severity": "CRITICAL",
+            "dimension": "completeness",
+            "threshold_rate": 0.0
+        },
+        {
+            "rule_id": "tip_003",
+            "rule_name": "text_not_null",
+            "rule_type": "null_check",
+            "column_name": "text",
+            "severity": "MAJOR",
+            "dimension": "completeness",
+            "threshold_rate": 0.01
+        }
+    ]
+}

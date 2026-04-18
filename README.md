@@ -64,6 +64,12 @@ flowchart LR
 - Full Bronze → Silver → Gold pipeline with metadata columns (`_ingest_ts`, `_source_file`, `_batch_id`)
 - Supports late-arriving data with lookback window reprocessing
 
+### Gold layer business value
+- `fact_review` — enables review-level analysis across businesses, users, and time
+- `dim_business` / `dim_user` / `dim_date` — dimension tables supporting multi-dimensional slicing
+- `business_metrics_gold` — identifies top-performing businesses by rating, review volume, and engagement
+- `city_metrics_gold` — supports market-level performance comparison across states and cities
+
 ### Custom data quality framework
 - Rule-based checks with severity levels (CRITICAL / MAJOR)
 - Structured results written to `dq_rule_result` and `dq_table_gate`
@@ -75,6 +81,8 @@ flowchart LR
 - When tracked attributes change, the old record is expired (`is_current = false`, `effective_to` set) and a new current record is inserted
 - Tracked attributes: name, city, state, stars, review_count, categories (business); name, review_count, average_stars, fans (user)
 - `fact_review` joins to dimensions on `is_current = true` to always reflect the latest version
+- Note: `fact_review` joins to dimensions on `is_current = true` for simplicity; 
+  point-in-time correctness is not preserved — a known trade-off accepted for this use case
 
 ### Gate & control flow (production-style)
 - CRITICAL DQ failure → BLOCKED, downstream Gold write is prevented
@@ -127,6 +135,8 @@ Each pipeline stage is designed to be safely re-runnable:
 ## Repository Structure
 
 ```
+<details>
+<summary>Repository Structure</summary>
 Yelp-data-engineering/
 ├── 01_bronze_ingest/
 │   ├── 01_0_bronze_run_all.ipynb
@@ -146,7 +156,8 @@ Yelp-data-engineering/
 │   ├── 03_0_dq_init_tables.ipynb
 │   ├── 03_1_dq_rule_engine.ipynb
 │   ├── 03_1_1_dq_rule_config.ipynb
-│   └── 03_2_dq_silver_run_all.ipynb
+│   ├── 03_2_dq_silver_run_all.ipynb
+│   └── dq_rules.json
 ├── 04_gold_marts/
 │   ├── 04_1_gold_fact_review.ipynb
 │   ├── 04_2_gold_dim_business.ipynb
@@ -158,18 +169,57 @@ Yelp-data-engineering/
 ├── 05_monitoring/
 │   ├── 05_0_monitoring_init.ipynb
 │   └── 05_1_monitoring_views.ipynb
+├── PL_Master/
+│   ├── PL_Master.json
+│   └── manifest.json
+├── docs/
+│   ├── DECISIONS.md
+│   ├── environment.md
+│   ├── lineage.md
+│   ├── monitoring.md
+│   └── screenshots/
+│       ├── dim_business_scd2.png
+│       ├── dq_results.png
+│       ├── monitor_run.png
+│       └── pl_master_run.png
 ├── tests/
+│   ├── conftest.py
 │   └── unit/
-│       ├── conftest.py
+│       ├── __init__.py
+│       ├── test_dq_rule_engine.py
 │       ├── test_scd2.py
-│       ├── test_silver_dedup.py
-│       └── test_dq_rule_engine.py
+│       └── test_silver_dedup.py
+├── yelp_lakehouse/
+│   └── dbo/
+│       └── Tables/
+│           ├── business_bronze.sql
+│           ├── business_metrics_gold.sql
+│           ├── business_silver.sql
+│           ├── checkin_bronze.sql
+│           ├── checkin_silver.sql
+│           ├── city_metrics_gold.sql
+│           ├── dim_business.sql
+│           ├── dim_date.sql
+│           ├── dim_user.sql
+│           ├── dq_rule_result.sql
+│           ├── dq_run_log.sql
+│           ├── dq_table_gate.sql
+│           ├── fact_review.sql
+│           ├── pipeline_run_log.sql
+│           ├── pipeline_sla_config.sql
+│           ├── review_bronze.sql
+│           ├── review_silver.sql
+│           ├── tip_bronze.sql
+│           ├── tip_silver.sql
+│           ├── user_bronze.sql
+│           └── user_silver.sql
 ├── .github/
 │   └── workflows/
 │       └── ci.yml
-├── requirements-dev.txt
+├── .gitignore
 ├── README.md
-└── environment.md
+└── requirements-dev.txt
+
 ```
 
 ---
@@ -253,6 +303,16 @@ This project is designed to run in Microsoft Fabric Lakehouse. Ensure that all B
 - [`docs/lineage.md`](./docs/lineage.md) — full data lineage
 - [`docs/monitoring.md`](./docs/monitoring.md) — observability framework details
 - [`docs/DECISIONS.md`](./docs/DECISIONS.md) — architecture decision records
+
+---
+
+## Limitations & Future Work
+
+- No streaming or real-time ingestion; pipeline is batch-only
+- No CDC (Change Data Capture) ingestion from operational databases
+- SCD2 joins use current snapshot only; point-in-time historical joins not implemented
+- Scale testing limited to Yelp dataset (~7M reviews); behavior at 10x scale not validated
+- No automated alerting on pipeline failure (monitoring views require manual refresh)
 
 ---
 
